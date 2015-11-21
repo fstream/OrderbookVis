@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+   <head>
+      <title>Order Book - Simulator</title>
+      <!-- Generated from src/less/order-book.less -->
+      <link rel="stylesheet" href="/order-book.css">
+
+      <!-- Demo styles -->
+      <style>
+         body {
+            margin: 3rem;
+            font-family: Tahoma;
+         }
+      </style>
+   </head>
+   <body>
+      <div class="toolbar">
+         <div id="pause" class="control-button">Pause</div>
+         <div id="rewind" class="control-button">Rewind 10s</div>
+         <div id="forward" class="control-button">Forward 10s</div>
+         ||
+         <div id="min-1" class="control-button">1 min</div>
+         <div id="min-2" class="control-button">2 min</div>
+         <div id="min-5" class="control-button">5 min</div>
+         Window ||
+         <div id="range-10_12" class="control-button">10-12</div>
+         <div id="range-0_12" class="control-button">0-12</div>
+         Price Range
+         || Filter
+         <input type="text" id="filter" oninput="filterMe()">
+      </div>
+      <div id="order-book-chart"></div>
+
+      <script src="/bower_components/d3/d3.js" charset="utf-8"></script>
+      <script src="/bower_components/lodash/lodash.js"></script>
+      <script src="/bower_components/moment/moment.js"></script>
+      <script src="/bower_components/d3-tip/index.js"></script>
+      <script src="/src/js/order-book.util.js"></script>
+      <script src="/src/js/order-book.js"></script>
+
+
+      <script type="application/javascript">
+         // Change speed to 0.001 to make really slow. 10 to make really fast. 1 is "realtime"
+         var speed = 50;
+         var includeTrades = true;
+         var events = [];
+         var bookviewer = new BookViewer();
+
+         // Load
+         d3.json("data/quotes.json", function (quotes) {
+            d3.json("data/trades.json", function (trades) {
+
+               events = quotes;
+               if (includeTrades === true) {
+                 events = events.concat(trades);
+               }
+               events = _.sortBy(events, function(evt) {
+                 return evt.dateTime;
+               });
+
+               bookviewer.init('order-book-chart', events[0].dateTime, events[0].ask);
+
+               // Preload stuff
+               bookviewer.preload([
+                  {"type":"QUOTE",
+                   "dateTime":1436899507717 - 9000,
+                   "symbol":"RY",
+                   "ask":14.0,
+                   "bid":10.8,
+                   "mid":10.9,
+                   "askAmount":956,
+                   "bidAmount":1399},
+                  {"type":"QUOTE",
+                   "dateTime":1436899507717 - 4500,
+                   "symbol":"RY",
+                   "ask":13.0,
+                   "bid":10.8,
+                   "mid":10.9,
+                   "askAmount":956,
+                   "bidAmount":1399},
+
+               ], [], []);
+
+               simulate(events);
+            });
+         });
+
+         var counter = 0;
+         function simulate(events) {
+           // Stream data
+           nextPoint(events);
+         }
+
+
+         // DC Hack Hack Hack
+         function filterMe() {
+            var val = d3.select('#filter').node().value;
+            bookviewer.setTradeFilter(val);
+         }
+
+         d3.select('#pause').on('click', function() {
+           var tmp = bookviewer.togglePause();
+           if (tmp === true) {
+             d3.select(this).text('Resume');
+           } else {
+             d3.select(this).text('Pause');
+           }
+         });
+         d3.select('#rewind').on('click', function() {
+           bookviewer.rewind( 1000 * 10);
+         });
+         d3.select('#forward').on('click', function() {
+           bookviewer.forward( 1000 * 10);
+         });
+         d3.select('#min-1').on('click', function() {
+           bookviewer.rescaleDateRange(1000 * 60);
+         });
+         d3.select('#min-2').on('click', function() {
+           bookviewer.rescaleDateRange(1000 * 60 * 2);
+         });
+         d3.select('#min-5').on('click', function() {
+           bookviewer.rescaleDateRange(1000 * 60 * 5);
+         });
+         d3.select('#range-10_12').on('click', function() {
+           bookviewer.rescalePriceRange(10, 12);
+         });
+         d3.select('#range-0_12').on('click', function() {
+           bookviewer.rescalePriceRange(0, 12);
+         });
+
+
+
+
+
+
+         function nextPoint(series, callback) {
+           counter++;
+           // if (counter > 2) return;
+           var point = series.shift();
+
+           // Fudge !!
+           if (point.ask) point.ask = point.ask.toFixed(4);
+           if (point.bid) point.bid = point.bid.toFixed(4);
+
+           if (point.type === 'QUOTE') {
+             onQuote(point);
+           } else if (point.type === 'TRADE') {
+             onTrade(point);
+           }
+
+
+           var next = series[0];
+           if (next) {
+
+             // Me is assuming dat price depth is on da interval yo'all !
+             // if (point.type === 'QUOTE')
+             onDepth({
+                dateTime: point.dateTime,
+                priceLevels: {
+                   11.6: Math.floor(5000  * Math.random()),
+                   11.5: Math.floor(6000  * Math.random()),
+                   11.4: Math.floor(7000  * Math.random()),
+                   11.2: Math.floor(8000  * Math.random()),
+                   11.1: Math.floor(9000  * Math.random()),
+                   11.0: Math.floor(10000 * Math.random()),
+                   10.9: Math.floor(9000  * Math.random()),
+                   10.8: Math.floor(8000  * Math.random()),
+                   10.7: Math.floor(7000  * Math.random()),
+                   10.6: Math.floor(6000  * Math.random()),
+                   10.5: Math.floor(5000  * Math.random())
+                }
+             });
+
+
+
+             var delay = (next.dateTime - point.dateTime)/speed;
+             delay = Math.floor(delay);
+
+             setTimeout(
+               function() { nextPoint(series, callback); },  delay
+             );
+           } else {
+             // Between here and away, become your space everyday
+             // bookviewer.stop();
+             return;
+           }
+         }
+
+         /*
+          * These are the simulated callbacks. Add your chart update calls here.
+          * I recommend keeping your chart js seperate from this file to keep things
+          * more managable.
+          */
+
+         function onTrade(trade) {
+           bookviewer.addTrade(trade);
+           bookviewer.guide(trade.dateTime);
+         }
+
+         function onQuote(quote) {
+           bookviewer.addQuote(quote);
+           bookviewer.guide(quote.dateTime);
+         }
+
+         function onDepth(depth) {
+           bookviewer.addDepth(depth);
+         }
+
+      </script>
+   </body>
+</html>

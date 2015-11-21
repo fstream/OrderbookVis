@@ -1,0 +1,11 @@
+{
+  "name": "order-book",
+  "version": "0.0.0",
+  "devDependencies": {},
+  "dependencies": {
+    "d3": "~3.5.9",
+    "lodash": "~3.10.0",
+    "d3-tip": "~0.6.7",
+    "moment": "momentjs#~2.10.6"
+  }
+}
